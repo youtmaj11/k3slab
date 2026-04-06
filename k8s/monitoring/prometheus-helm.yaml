@@ -1,0 +1,116 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+    phase: "4"
+spec:
+  chart: prometheus
+  repo: https://prometheus-community.github.io/helm-charts
+  version: 25.3.1
+  releaseName: prometheus
+  targetNamespace: monitoring
+  
+  values: |
+    # Prometheus Global Configuration
+    global:
+      rbac:
+        create: true
+    
+    # Prometheus Service Account
+    serviceAccount:
+      create: true
+      name: prometheus
+    
+    # Prometheus Server
+    prometheus:
+      prometheusSpec:
+        # Storage
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: longhorn
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 10Gi
+        
+        # Resource Limits
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        
+        # Service Monitor Selector
+        serviceMonitorSelectorNilUsesHelmValues: false
+        ruleSelector:
+          matchLabels:
+            prometheus: kube-prometheus
+        
+        # Retention
+        retention: 30d
+        retentionSize: "9GB"
+        
+        # Security Context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          fsGroup: 65534
+        
+        # Container Security
+        containers:
+          - name: prometheus
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+    
+    # Prometheus Operator
+    prometheusOperator:
+      enabled: true
+      manageCrds: true
+      resources:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    
+    # Alert Manager disabled for skeleton
+    alertmanager:
+      enabled: false
+    
+    # Grafana disabled (deployed separately)
+    grafana:
+      enabled: false
+    
+    # Node Exporter
+    nodeExporter:
+      enabled: true
+      resources:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+    
+    # Kube State Metrics
+    kubeStateMetrics:
+      enabled: true
+      resources:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
