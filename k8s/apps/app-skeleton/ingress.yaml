@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-skeleton
+  namespace: default
+  labels:
+    app: app-skeleton
+    phase: "2"
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "false"
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: api.homelab.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app-skeleton
+            port:
+              number: 8080

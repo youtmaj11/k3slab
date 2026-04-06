@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-skeleton
+  namespace: default
+  labels:
+    app: app-skeleton
+    version: v1
+    phase: "2"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: app-skeleton
+  template:
+    metadata:
+      labels:
+        app: app-skeleton
+        version: v1
+    spec:
+      # Scheduling
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+
+      # Security Context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+
+      containers:
+      - name: app-skeleton
+        image: app-skeleton:latest
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        
+        # Environment Variables
+        env:
+        - name: APP_ENV
+          value: "development"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: DB_HOST
+          value: "postgres.default.svc.cluster.local"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: "app_db"
+        - name: REDIS_HOST
+          value: "redis.default.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        
+        # Probes
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 2
+
+        # Resource Limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Security
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
