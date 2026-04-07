@@ -1,6 +1,6 @@
 # k3s Lab: GitOps-Driven Homelab Platform
 
-A declarative, GitOps-first Kubernetes homelab platform—portfolio piece for Senior DevOps & Platform Engineering roles.
+A declarative, GitOps-first Kubernetes homelab platform—portfolio piece for DevOps & Platform Engineering roles.
 
 **Key Highlights:** 100% YAML infrastructure | Helm-driven deployments | GitHub Actions CI/CD | Prometheus/Grafana observability | Longhorn storage | Traefik ingress
 
