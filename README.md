@@ -16,6 +16,7 @@ Git Push → Build CI (Docker → GHCR) → Deploy CD (SSH → kubectl apply)
 **Cluster Components:**
 - **App:** Deployment (2x pods) + Service + Traefik Ingress → `api.homelab.local`
 - **Data:** PostgreSQL (Helm) + Redis (Helm) on Longhorn storage
+- **Storage UI:** Longhorn UI via `longhorn.homelab.local`
 - **Observability:** Prometheus + Grafana
 
 ---
@@ -56,6 +57,10 @@ k3s-lab/
     └── monitoring/                         # Phase 4: Observability
         ├── prometheus-helm.yaml            # Prometheus + Node Exporter
         └── grafana-helm.yaml               # Grafana dashboards
+    └── storage/                            # Phase 5: Longhorn storage operator
+        ├── namespace.yaml                  # Longhorn namespace
+        ├── longhorn-helm.yaml              # HelmChart deploy for Longhorn
+        └── longhorn-ui-ingress.yaml        # Traefik routing to Longhorn UI
 ```
 
 ---

@@ -1,0 +1,30 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: longhorn
+  namespace: longhorn-system
+  labels:
+    app: longhorn
+    phase: "4"
+spec:
+  chart: longhorn
+  repo: https://charts.longhorn.io
+  version: 1.5.4
+  releaseName: longhorn
+  targetNamespace: longhorn-system
+  values: |
+    persistence:
+      defaultClass: true
+      defaultClassReplicaCount: 3
+      defaultFsType: ext4
+      reclaimPolicy: Delete
+      migratable: false
+    defaultSettings:
+      defaultDataPath: /var/lib/longhorn
+    service:
+      ui:
+        type: ClusterIP
+    networkPolicies:
+      enabled: false
+    csi:
+      kubeletRootDir: /var/lib/kubelet
