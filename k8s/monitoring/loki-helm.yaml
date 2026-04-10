@@ -1,0 +1,63 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: loki
+  namespace: monitoring
+  labels:
+    app: loki
+    phase: "4"
+spec:
+  chart: loki
+  repo: https://grafana.github.io/helm-charts
+  version: 2.8.0
+  releaseName: loki
+  targetNamespace: monitoring
+  values: |
+    persistence:
+      enabled: true
+      storageClassName: longhorn
+      accessModes:
+        - ReadWriteOnce
+      size: 10Gi
+    service:
+      type: ClusterIP
+      port: 3100
+    config:
+      table_manager:
+        retention_deletes_enabled: false
+      schema_config:
+        configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+      storage_config:
+        boltdb_shipper:
+          active_index_directory: /data/loki/index
+          cache_location: /data/loki/cache
+          shared_store: filesystem
+        filesystem:
+          directory: /data/loki/chunks
+      ruler:
+        alertmanager_url: http://alertmanager:9093
+        storage:
+          type: local
+          local:
+            directory: /data/loki/rules
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 512Mi
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1001
+      fsGroup: 1001
+    serviceAccount:
+      create: true
+      name: loki
