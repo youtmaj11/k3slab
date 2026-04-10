@@ -83,7 +83,7 @@ jobs:
         image: postgres:15
         env:
           POSTGRES_USER: app_user
-          POSTGRES_PASSWORD: changeme
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: app_db
         ports:
           - 5432:5432
@@ -133,7 +133,7 @@ jobs:
           DB_PORT=5432
           DB_NAME=app_db
           DB_USER=app_user
-          DB_PASSWORD=changeme
+          DB_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           REDIS_HOST=localhost
           REDIS_PORT=6379
           RABBITMQ_USER=guest

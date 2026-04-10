@@ -10,16 +10,17 @@ spec:
   chart: grafana
   repo: https://grafana.github.io/helm-charts
   version: 7.0.8
-  releaseName: grafana
   targetNamespace: monitoring
   
-  values: |
+  valuesContent: |
     # Grafana Configuration
     replicas: 1
     
-    # Admin Credentials (Change in production!)
+    # Admin Credentials (managed via sealed secret)
     adminUser: admin
-    adminPassword: "changeme"
+    admin:
+      existingSecret: grafana-credentials
+      existingSecretPasswordKey: admin-password
     
     # Service Account
     serviceAccount:
@@ -104,6 +105,5 @@ spec:
     # Environment Variables
     env:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: "changeme"
       GF_INSTALL_PLUGINS: "grafana-piechart-panel"
       GF_USERS_ALLOW_SIGN_UP: "false"
