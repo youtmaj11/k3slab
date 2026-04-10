@@ -70,3 +70,80 @@ jobs:
         run: |
           echo "Build completed successfully"
           echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: app_user
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: app_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app_user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      rabbitmq:
+        image: rabbitmq:3.12-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        ports:
+          - 5672:5672
+          - 15672:15672
+        options: >-
+          --health-cmd "curl -f http://localhost:15672/api/health/alive || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install test tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client redis-tools curl
+
+      - name: Verify Postgres connectivity
+        run: |
+          for i in $(seq 1 20); do
+            PGPASSWORD=changeme pg_isready -h localhost -p 5432 -U app_user && break
+            sleep 3
+          done
+          PGPASSWORD=changeme psql -h localhost -U app_user -d app_db -c 'SELECT 1' | grep -q 1
+
+      - name: Verify Redis connectivity
+        run: |
+          for i in $(seq 1 20); do
+            redis-cli -h localhost -p 6379 ping | grep -q PONG && break
+            sleep 3
+          done
+
+      - name: Verify RabbitMQ connectivity
+        run: |
+          for i in $(seq 1 20); do
+            curl -fsS -u guest:guest http://localhost:15672/api/overview && break
+            sleep 3
+          done
