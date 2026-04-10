@@ -5,15 +5,11 @@ on:
     branches:
       - main
     paths:
-      - 'k8s/apps/app-skeleton/**'
+      - 'k8s/**'
       - '.github/workflows/deploy-cd.yaml'
 
-env:
-  DEPLOYMENT_NAME: app-skeleton
-  NAMESPACE: default
-
 jobs:
-  deploy:
+  notify-argocd:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -21,35 +17,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST_IP }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            echo "Deploying to k3s cluster..."
-            
-            # Apply Kubernetes manifests
-            kubectl apply -f /path/to/k8s/apps/app-skeleton/deployment.yaml
-            kubectl apply -f /path/to/k8s/apps/app-skeleton/service.yaml
-            kubectl apply -f /path/to/k8s/apps/app-skeleton/ingress.yaml
-            
-            # Trigger rollout restart
-            kubectl rollout restart deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }}
-            
-            # Wait for rollout to complete
-            kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} --timeout=5m
-            
-            echo "✓ Deployment complete"
-
-      - name: Verify deployment
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST_IP }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            echo "Verifying deployment status..."
-            kubectl get deployment ${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }}
-            kubectl get pods -l app=${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }}
+      - name: Notify ArgoCD of repository update
+        run: |
+          echo "Kubernetes manifest changes have been pushed to main."
+          echo "ArgoCD will automatically reconcile changes for the k8s/ folder."
