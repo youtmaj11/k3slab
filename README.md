@@ -218,6 +218,22 @@ Add screenshots here once the dashboard and app UI are available.
 - GitHub Actions tests connectivity for the full stack
 - Ansible used for repeatable cluster bootstrap
 
+## 🔐 Security & Secrets
+
+This platform uses **Sealed Secrets** for secure GitOps secret management.
+
+- Sensitive credentials are stored in the repo only as encrypted `SealedSecret` objects.
+- The Sealed Secrets controller decrypts them into Kubernetes `Secret` resources at runtime.
+- Example sealed secrets in this repo:
+  - `k8s/database/postgresql-sealedsecret.yaml`
+  - `k8s/apps/redis/redis-sealedsecret.yaml`
+  - `k8s/monitoring/grafana-sealedsecret.yaml`
+- The Sealed Secrets controller manifest is tracked under `k8s/gitops/sealed-secrets-controller.yaml`.
+- No plaintext passwords are committed to YAML manifests or Helm values.
+- CI avoids hardcoded secret values by using GitHub Actions secrets like `POSTGRES_PASSWORD`.
+
+For production readiness, ensure the controller private key remains secure and rotate sealed secrets if the private key changes.
+
 ---
 
 ## 🧭 Troubleshooting
