@@ -1,29 +1,6 @@
 # k3s Lab: GitOps Homelab Platform
 
 A portfolio-ready homelab platform built with k3s, GitOps, and modern Kubernetes best practices.
-
-**Key Highlights:** GitOps-first architecture | ArgoCD application delivery | Ansible bootstrap automation | Helm-based workloads | Observability with Loki, Prometheus, Grafana | Persistent Longhorn storage | Secure non-root containers
-
----
-
-## 🚀 Project Overview
-
-This repository demonstrates a complete homelab stack with a focus on:
-- Declarative Kubernetes infrastructure
-- GitOps-driven deployment and lifecycle management
-- Observability and logging for platform operations
-- Secure workload configuration with resource limits and non-root execution
-- Ansible automation for bootstrap and cluster preparation
-
----
-
-## 🧩 Architecture
-
-**GitOps Flow:**
-```text
-Git Push → Build CI → ArgoCD sync → Kubernetes cluster
-```
-
 **Latest Architecture Components:**
 - **ArgoCD:** GitOps application delivery engine managing `k8s/apps/*` and monitoring workloads
 - **Ansible:** Bootstraps k3s clusters and prepares the target environment
