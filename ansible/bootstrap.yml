@@ -1,0 +1,8 @@
+---
+- name: Bootstrap k3s cluster
+  hosts: all
+  become: true
+  gather_facts: true
+
+  roles:
+    - k3s
