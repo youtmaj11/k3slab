@@ -60,7 +60,7 @@ spec:
       port: 80
       targetPort: 3000
     
-    # Data Sources (Prometheus autodiscovery)
+    # Data Sources (Prometheus + Loki)
     datasources:
       datasources.yaml:
         apiVersion: 1
@@ -72,7 +72,14 @@ spec:
           isDefault: true
           jsonData:
             timeInterval: 30s
-    
+        - name: Loki
+          type: loki
+          url: http://loki.monitoring.svc.cluster.local:3100
+          access: proxy
+          isDefault: false
+          jsonData:
+            maxLines: 1000
+
     # Dashboards
     dashboardProviders:
       dashboardproviders.yaml:
