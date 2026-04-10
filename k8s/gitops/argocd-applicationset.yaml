@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: k3slab-applicationset
+  namespace: gitops
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/youtmaj11/k3slab.git
+        revision: HEAD
+        directories:
+          - path: k8s/apps/*
+          - path: k8s/monitoring
+  template:
+    metadata:
+      name: '{{path.basename}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/youtmaj11/k3slab.git
+        targetRevision: HEAD
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+      ignoreDifferences:
+        - group: helm.cattle.io
+          kind: HelmChart
+          jsonPointers:
+            - /metadata/annotations
+            - /status
+            - /spec/values
+            - /spec/releaseName
+            - /spec/failurePolicy
