@@ -13,15 +13,20 @@ spec:
   releaseName: postgres
   targetNamespace: default
   
-  values: |
+  valuesContent: |
     # PostgreSQL Configuration
+    image:
+      tag: latest
     global:
       postgresql:
         auth:
-          username: postgres
-          password: "changeme"
+          username: app_user
           database: app_db
-    
+          existingSecret: postgres-credentials
+          secretKeys:
+            adminPasswordKey: postgres-password
+            userPasswordKey: password
+
     # Primary Replica Configuration
     primary:
       # Persistence

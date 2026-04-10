@@ -9,15 +9,14 @@ metadata:
 spec:
   chart: redis
   repo: https://charts.bitnami.com/bitnami
-  version: 17.21.0
-  releaseName: redis
+  version: 25.3.10
   targetNamespace: default
   
-  values: |
+  valuesContent: |
     # Redis Configuration
     auth:
       enabled: true
-      password: "changeme"
+      existingSecret: redis-credentials
     
     # Master Configuration
     master:
