@@ -97,11 +97,6 @@ k3slab/
 4. Kubernetes applies deployments, Helm charts, and monitoring services automatically.
 5. Observability stack validates health and logs.
 
----
-
-## 🧪 Demo Video Link
-
-> Video demo coming soon — insert link here once available.
 
 ---
 
@@ -197,12 +192,6 @@ kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
 kubectl port-forward -n monitoring svc/loki 3100:3100
 # http://localhost:3100
 ```
-
----
-
-## 📷 Screenshots
-
-Add screenshots here once the dashboard and app UI are available.
 
 ---
 
