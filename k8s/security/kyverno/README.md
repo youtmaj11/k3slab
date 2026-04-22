@@ -4,8 +4,8 @@ This folder contains the Kyverno policies used for cluster-wide admission contro
 
 ## Installation
 
-Kyverno is already installed via the existing helm manifest at:
-- `k8s/security/namespace-baseline/kyverno-helm.yaml`
+Kyverno is installed via Helm using the manifest in this folder:
+- `k8s/security/kyverno/kyverno-helm.yaml`
 
 ## Global policy definitions
 
@@ -28,3 +28,19 @@ The following cluster-wide policies are defined in `global-enforcement-policies.
 - Start with `validationFailureAction: audit` for each ClusterPolicy.
 - After validating behavior, change `validationFailureAction` to `enforce`.
 - Verify with the provided `test-enforcement.sh` script.
+
+## Testing steps
+
+Run the included test script to exercise admission checks:
+
+```bash
+chmod +x k8s/security/kyverno/test-enforcement.sh
+./k8s/security/kyverno/test-enforcement.sh
+```
+
+The script applies the following cases:
+- privileged container pod
+- missing resource limits pod
+- pod with hostPath volume
+- namespace creation without required labels
+- namespace creation with required labels
