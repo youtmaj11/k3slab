@@ -1,0 +1,28 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-namespace-labels
+spec:
+  validationFailureAction: enforce
+  background: true
+  rules:
+    - name: check-required-namespace-labels
+      match:
+        resources:
+          kinds:
+            - Namespace
+      exclude:
+        resources:
+          names:
+            - kube-system
+            - kube-public
+            - gatekeeper-system
+            - kyverno
+      validate:
+        message: "Namespace must have labels 'app', 'owner', and 'environment'."
+        pattern:
+          metadata:
+            labels:
+              app: "?*"
+              owner: "?*"
+              environment: "?*"

@@ -1,0 +1,37 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: generate-namespace-baseline-rolebinding
+spec:
+  background: true
+  rules:
+    - name: create-namespace-baseline-rolebinding
+      match:
+        resources:
+          kinds:
+            - Namespace
+      exclude:
+        resources:
+          names:
+            - kube-system
+            - kube-public
+            - gatekeeper-system
+            - kyverno
+      generate:
+        kind: RoleBinding
+        name: namespace-baseline-binding
+        synchronize: true
+        data:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: namespace-baseline-binding
+            namespace: "{{request.object.metadata.name}}"
+          subjects:
+            - kind: ServiceAccount
+              name: default
+              namespace: "{{request.object.metadata.name}}"
+          roleRef:
+            kind: Role
+            name: namespace-baseline
+            apiGroup: rbac.authorization.k8s.io

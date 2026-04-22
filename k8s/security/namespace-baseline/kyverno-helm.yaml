@@ -1,0 +1,28 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: kyverno
+  namespace: kyverno
+  labels:
+    app: kyverno
+    phase: "6"
+spec:
+  chart: kyverno
+  repo: https://kyverno.github.io/kyverno/
+  version: 2.6.0
+  targetNamespace: kyverno
+  createNamespace: true
+  valuesContent: |
+    replicaCount: 1
+    image:
+      tag: v2.6.0
+    webhook:
+      failurePolicy: Fail
+      timeoutSeconds: 10
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
