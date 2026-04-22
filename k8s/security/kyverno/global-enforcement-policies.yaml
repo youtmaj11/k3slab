@@ -3,7 +3,7 @@ kind: ClusterPolicy
 metadata:
   name: audit-deny-privileged-containers
 spec:
-  validationFailureAction: audit
+  validationFailureAction: enforce
   background: true
   rules:
     - name: deny-privileged-containers
@@ -35,7 +35,7 @@ kind: ClusterPolicy
 metadata:
   name: audit-require-run-as-non-root
 spec:
-  validationFailureAction: audit
+  validationFailureAction: enforce
   background: true
   rules:
     - name: require-run-as-non-root
@@ -103,7 +103,7 @@ kind: ClusterPolicy
 metadata:
   name: audit-deny-hostpath-volumes
 spec:
-  validationFailureAction: audit
+  validationFailureAction: enforce
   background: true
   rules:
     - name: deny-hostpath-volumes
@@ -135,7 +135,7 @@ kind: ClusterPolicy
 metadata:
   name: audit-require-namespace-labels
 spec:
-  validationFailureAction: audit
+  validationFailureAction: enforce
   background: true
   rules:
     - name: require-namespace-labels
