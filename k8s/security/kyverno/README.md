@@ -28,6 +28,7 @@ The following cluster-wide policies are defined in `global-enforcement-policies.
 - Start with `validationFailureAction: audit` for each ClusterPolicy.
 - After validating behavior, change `validationFailureAction` to `enforce`.
 - Verify with the provided `test-enforcement.sh` script.
+- See `migration-plan.md` for the enforce rollout plan, risk table, and rollback instructions.
 
 ## Testing steps
 
