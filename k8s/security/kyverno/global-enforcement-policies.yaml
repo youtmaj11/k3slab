@@ -1,0 +1,153 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-deny-privileged-containers
+spec:
+  validationFailureAction: audit
+  background: true
+  rules:
+    - name: deny-privileged-containers
+      match:
+        resources:
+          kinds:
+            - Pod
+            - Deployment
+            - StatefulSet
+            - DaemonSet
+            - ReplicaSet
+            - Job
+            - CronJob
+      validate:
+        message: "Privileged containers are not allowed."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - securityContext:
+                      privileged: false
+            containers:
+              - securityContext:
+                  privileged: false
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-require-run-as-non-root
+spec:
+  validationFailureAction: audit
+  background: true
+  rules:
+    - name: require-run-as-non-root
+      match:
+        resources:
+          kinds:
+            - Pod
+            - Deployment
+            - StatefulSet
+            - DaemonSet
+            - ReplicaSet
+            - Job
+            - CronJob
+      validate:
+        message: "Containers must set runAsNonRoot: true."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - securityContext:
+                      runAsNonRoot: true
+            containers:
+              - securityContext:
+                  runAsNonRoot: true
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-require-resource-limits
+spec:
+  validationFailureAction: audit
+  background: true
+  rules:
+    - name: require-resource-limits
+      match:
+        resources:
+          kinds:
+            - Pod
+            - Deployment
+            - StatefulSet
+            - DaemonSet
+            - ReplicaSet
+            - Job
+            - CronJob
+      validate:
+        message: "Containers must define CPU and memory limits."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - resources:
+                      limits:
+                        cpu: "?*"
+                        memory: "?*"
+            containers:
+              - resources:
+                  limits:
+                    cpu: "?*"
+                    memory: "?*"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-deny-hostpath-volumes
+spec:
+  validationFailureAction: audit
+  background: true
+  rules:
+    - name: deny-hostpath-volumes
+      match:
+        resources:
+          kinds:
+            - Pod
+            - Deployment
+            - StatefulSet
+            - DaemonSet
+            - ReplicaSet
+            - Job
+            - CronJob
+      validate:
+        message: "hostPath volumes are not allowed."
+        deny:
+          anyPattern:
+            - spec:
+                template:
+                  spec:
+                    volumes:
+                      - hostPath: "*"
+            - spec:
+                volumes:
+                  - hostPath: "*"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-require-namespace-labels
+spec:
+  validationFailureAction: audit
+  background: true
+  rules:
+    - name: require-namespace-labels
+      match:
+        resources:
+          kinds:
+            - Namespace
+      validate:
+        message: "Namespace must have labels 'app', 'owner', and 'environment'."
+        pattern:
+          metadata:
+            labels:
+              app: "?*"
+              owner: "?*"
+              environment: "?*"
