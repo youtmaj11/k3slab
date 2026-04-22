@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: default
+spec:
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: postgres-backup
+              image: postgres:15
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-credentials
+                      key: postgres-password
+                - name: PGUSER
+                  value: app_user
+                - name: PGDATABASE
+                  value: app_db
+                - name: PGHOST
+                  value: postgres.default.svc.cluster.local
+                - name: PGPORT
+                  value: "5432"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  mkdir -p /backup
+                  exec pg_dump --format=custom --file=/backup/pgdump-$(date +%Y%m%d%H%M%S).dump
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backup
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: postgres-backup-pvc
