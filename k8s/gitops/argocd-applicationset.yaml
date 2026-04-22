@@ -16,7 +16,6 @@ spec:
           - path: k8s/security/database
           - path: k8s/security/monitoring
           - path: k8s/security/namespace-baseline
-          - path: k8s/security/kyverno
           - path: k8s/gitops/policies
           - path: k8s/storage
   template:

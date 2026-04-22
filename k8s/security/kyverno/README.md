@@ -30,6 +30,10 @@ The following cluster-wide policies are defined in `global-enforcement-policies.
 - Verify with the provided `test-enforcement.sh` script.
 - See `migration-plan.md` for the enforce rollout plan, risk table, and rollback instructions.
 
+## Kyverno runtime installation
+
+Kyverno is installed by ArgoCD using `k8s/gitops/argocd-kyverno-app.yaml` and the Helm chart manifest in this folder.
+
 ## Testing steps
 
 Run the included test script to exercise admission checks:
@@ -44,4 +48,21 @@ The script applies the following cases:
 - missing resource limits pod
 - pod with hostPath volume
 - namespace creation without required labels
+
+## Verification commands
+
+```bash
+kubectl get ns kyverno
+kubectl get pods -n kyverno
+kubectl get crd clusterpolicies.policy.kyverno.io policyexceptions.policy.kyverno.io
+kubectl get validatingwebhookconfigurations | grep kyverno
+kubectl get mutatingwebhookconfigurations | grep kyverno || true
+```
+
+## Troubleshooting
+
+- If `kyverno` namespace is missing, confirm ArgoCD synced `k8s/gitops/argocd-kyverno-app.yaml`.
+- If `kyverno-admission-controller` is not running, check pod logs with `kubectl logs -n kyverno -l app=kyverno`.
+- If webhook resources are missing, verify the Helm chart was installed with `installCRDs: true`.
+- If enforcement is not rejecting, confirm `validationFailureAction: enforce` on critical `ClusterPolicy` resources.
 - namespace creation with required labels
