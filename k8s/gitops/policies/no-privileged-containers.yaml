@@ -1,0 +1,15 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sNoPrivilegedContainers
+metadata:
+  name: no-privileged-containers
+spec:
+  match:
+    excludedNamespaces:
+      - kube-system
+      - gatekeeper-system
+      - cert-manager
+      - kubernetes-dashboard
+      - local-path-storage
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]

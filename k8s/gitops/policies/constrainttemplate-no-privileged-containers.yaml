@@ -1,0 +1,35 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8snoPrivilegedContainers
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sNoPrivilegedContainers
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8snoPrivilegedContainers
+
+        violation[{
+          "msg": msg,
+          "details": {"container": container.name},
+        }] {
+          input.review.object.kind == "Pod"
+          container := input.review.object.spec.containers[_]
+          is_privileged(container)
+          msg := sprintf("Privileged container is not allowed: %v", [container.name])
+        }
+
+        is_privileged(container) {
+          container.securityContext.privileged == true
+        }
+
+        is_privileged(container) {
+          container.securityContext.capabilities.add[_] == "SYS_ADMIN"
+        }
+
+        is_privileged(container) {
+          container.securityContext.capabilities.add[_] == "NET_ADMIN"
+        }

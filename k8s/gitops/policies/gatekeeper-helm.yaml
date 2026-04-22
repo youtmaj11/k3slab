@@ -1,0 +1,25 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: gatekeeper
+  namespace: gatekeeper-system
+  labels:
+    app: gatekeeper
+    phase: "5"
+spec:
+  chart: gatekeeper
+  repo: https://open-policy-agent.github.io/gatekeeper/charts
+  version: 3.13.0
+  targetNamespace: gatekeeper-system
+  createNamespace: true
+  valuesContent: |
+    auditInterval: 60
+    enableMutations: false
+    securityContext:
+      runAsUser: 1000
+      runAsNonRoot: true
+      runAsGroup: 1000
+      fsGroup: 1000
+    webhook:
+      failurePolicy: Fail
+      timeoutSeconds: 10

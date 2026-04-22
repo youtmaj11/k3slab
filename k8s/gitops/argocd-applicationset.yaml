@@ -14,6 +14,7 @@ spec:
           - path: k8s/security/tls
           - path: k8s/security/argocd
           - path: k8s/security/database
+          - path: k8s/gitops/policies
           - path: k8s/storage
   template:
     metadata:

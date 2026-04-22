@@ -1,0 +1,19 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequirePodLabels
+metadata:
+  name: require-pod-labels
+spec:
+  match:
+    excludedNamespaces:
+      - kube-system
+      - gatekeeper-system
+      - cert-manager
+      - kubernetes-dashboard
+      - local-path-storage
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+  parameters:
+    labels:
+      - app
+      - phase

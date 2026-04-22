@@ -1,0 +1,24 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequirePodLabels
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequirePodLabels
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequirePodLabels
+
+        required_labels := {"app", "phase"}
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "Pod"
+          missing := required_labels - {k | k := object.labels[_]}
+          count(missing) > 0
+          msg := sprintf("Pod is missing required labels: %v", [missing])
+        }
+
+        object := input.review.object.metadata
