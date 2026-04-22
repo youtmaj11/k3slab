@@ -17,7 +17,7 @@ spec:
     # Prometheus Global Configuration
     global:
       rbac:
-        create: true
+        create: false
     
     # Prometheus Service Account
     serviceAccount:
