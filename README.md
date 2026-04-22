@@ -15,17 +15,6 @@ A portfolio-ready homelab platform built with k3s, GitOps, and modern Kubernetes
 
 ---
 
-## 📌 What’s New
-
-- Added **ArgoCD** deployment and application bootstrap
-- Added **Ansible** cluster setup for repeatable cluster provisioning
-- Added **Loki** for log collection and query
-- Hardened workloads with **non-root securityContext** and **resource limits**
-- Added GitHub Actions **integration test** for full stack connectivity
-- Added README content for portfolio presentation and architecture storytelling
-
----
-
 ## 📁 Project Structure
 
 ```
