@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kyverno-sentinel
+  namespace: kyverno-sentinel
+  labels:
+    app: kyverno-sentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kyverno-sentinel
+  template:
+    metadata:
+      labels:
+        app: kyverno-sentinel
+    spec:
+      serviceAccountName: kyverno-sentinel
+      containers:
+        - name: kyverno-sentinel
+          image: python:3.12-slim
+          command:
+            - sh
+            - -c
+            - |
+              python -m pip install --no-cache-dir kubernetes prometheus_client >/dev/null 2>&1 && python /app/health-agent.py
+          ports:
+            - name: metrics
+              containerPort: 8000
+          volumeMounts:
+            - name: script
+              mountPath: /app
+      volumes:
+        - name: script
+          configMap:
+            name: kyverno-sentinel-script

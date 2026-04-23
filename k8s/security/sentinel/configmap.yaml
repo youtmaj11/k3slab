@@ -6,32 +6,118 @@ metadata:
   labels:
     app: kyverno-sentinel
 data:
-  health-check.sh: |
-    #!/usr/bin/env sh
-    set -euo pipefail
-    checks=0
-    failures=0
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Kyverno sentinel health check started"
+  health-agent.py: |
+    import logging
+    import threading
+    import time
+    from kubernetes import client, config, watch
+    from kubernetes.client.exceptions import ApiException
+    from prometheus_client import Gauge, start_http_server
 
-    check() {
-      checks=$((checks + 1))
-      if ! sh -c "$1" >/dev/null 2>&1; then
-        echo "[FAIL] $2"
-        failures=$((failures + 1))
-      else
-        echo "[OK] $2"
-      fi
-    }
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
 
-    check "kubectl get application kyverno -n gitops" "ArgoCD Application kyverno exists"
-    check "kubectl get namespace kyverno" "namespace kyverno exists"
-    check "kubectl get pod -n kyverno | grep -E 'kyverno-admission-controller|kyverno-background-controller'" "Kyverno pods exist"
-    check "kubectl get crd clusterpolicies.policy.kyverno.io" "ClusterPolicy CRD exists"
-    check "kubectl get crd policyexceptions.policy.kyverno.io" "PolicyException CRD exists"
-    check "kubectl get validatingwebhookconfigurations | grep -i kyverno" "Kyverno validating webhook exists"
+    app_missing = Gauge('kyverno_app_missing', 'Kyverno ArgoCD Application missing')
+    namespace_missing = Gauge('kyverno_namespace_missing', 'Kyverno namespace missing')
+    webhook_missing = Gauge('kyverno_webhook_missing', 'Kyverno validating webhook missing')
+    crd_missing = Gauge('kyverno_crd_missing', 'Kyverno CRD missing')
+    pod_missing = Gauge('kyverno_pod_missing', 'Kyverno pod missing', ['pod'])
 
-    if [ "$failures" -gt 0 ]; then
-      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Kyverno sentinel detected ${failures}/${checks} failures"
-      exit 1
-    fi
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Kyverno sentinel healthy"
+    def reconcile():
+        try:
+            config.load_incluster_config()
+        except Exception:
+            config.load_kube_config()
+
+        custom_api = client.CustomObjectsApi()
+        core_api = client.CoreV1Api()
+        ext_api = client.ApiextensionsV1Api()
+        admission_api = client.AdmissionregistrationV1Api()
+
+        missing = False
+
+        try:
+            custom_api.get_namespaced_custom_object('argoproj.io', 'v1alpha1', 'gitops', 'applications', 'kyverno')
+            app_missing.set(0)
+            logging.info('ArgoCD Application kyverno exists')
+        except ApiException as exc:
+            app_missing.set(1)
+            missing = True
+            logging.error('ArgoCD Application kyverno missing (%s)', getattr(exc, 'status', exc))
+
+        try:
+            core_api.read_namespace('kyverno')
+            namespace_missing.set(0)
+            logging.info('namespace kyverno exists')
+        except ApiException as exc:
+            namespace_missing.set(1)
+            missing = True
+            logging.error('namespace kyverno missing (%s)', getattr(exc, 'status', exc))
+
+        for pod_name in ['kyverno-admission-controller', 'kyverno-background-controller']:
+            pods = core_api.list_namespaced_pod('kyverno', field_selector=f'metadata.name={pod_name}').items
+            if pods:
+                pod_missing.labels(pod_name).set(0)
+                logging.info('pod %s exists', pod_name)
+            else:
+                pod_missing.labels(pod_name).set(1)
+                missing = True
+                logging.error('pod %s missing', pod_name)
+
+        crds = ['clusterpolicies.policy.kyverno.io', 'policyexceptions.policy.kyverno.io']
+        crd_error = False
+        for crd in crds:
+            try:
+                ext_api.read_custom_resource_definition(crd)
+                logging.info('CRD %s exists', crd)
+            except ApiException as exc:
+                crd_missing.set(1)
+                crd_error = True
+                missing = True
+                logging.error('CRD %s missing (%s)', crd, getattr(exc, 'status', exc))
+        if not crd_error:
+            crd_missing.set(0)
+
+        try:
+            webhooks = admission_api.list_validating_webhook_configuration().items
+            if any('kyverno' in wh.metadata.name for wh in webhooks):
+                webhook_missing.set(0)
+                logging.info('Kyverno validating webhook exists')
+            else:
+                webhook_missing.set(1)
+                missing = True
+                logging.error('Kyverno validating webhook missing')
+        except ApiException as exc:
+            webhook_missing.set(1)
+            missing = True
+            logging.error('Failed to list validating webhooks (%s)', getattr(exc, 'status', exc))
+
+        if missing:
+            logging.error('Kyverno sentinel detected unhealthy control plane state')
+        else:
+            logging.info('Kyverno sentinel all checks OK')
+
+    def watch_resource(func, *args, **kwargs):
+        w = watch.Watch()
+        while True:
+            try:
+                stream = w.stream(func, *args, timeout_seconds=60, **kwargs)
+                for _ in stream:
+                    reconcile()
+            except Exception as exc:
+                logging.warning('watch loop error: %s', exc)
+                time.sleep(5)
+
+    if __name__ == '__main__':
+        start_http_server(8000)
+        reconcile()
+        watchers = [
+            threading.Thread(target=watch_resource, args=(client.CoreV1Api().list_namespace,)),
+            threading.Thread(target=watch_resource, args=(client.CoreV1Api().list_namespaced_pod, 'kyverno')),
+            threading.Thread(target=watch_resource, args=(client.ApiextensionsV1Api().list_custom_resource_definition,)),
+            threading.Thread(target=watch_resource, args=(client.AdmissionregistrationV1Api().list_validating_webhook_configuration,)),
+        ]
+        for thread in watchers:
+            thread.daemon = True
+            thread.start()
+        while True:
+            time.sleep(30)

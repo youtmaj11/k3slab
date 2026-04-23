@@ -1,0 +1,326 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kyverno-remediator-script
+  namespace: kyverno-sentinel
+  labels:
+    app: kyverno-sentinel
+data:
+  remediator.py: |
+    import logging
+    import time
+    import yaml
+    from datetime import datetime, timezone
+    from kubernetes import client, config
+    from kubernetes.client.exceptions import ApiException
+
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
+
+dependency-model.yaml: |
+  components:
+    api-server:
+      depends: []
+    argocd:
+      depends:
+        - api-server
+    prometheus:
+      depends:
+        - api-server
+    webhook-system:
+      depends:
+        - api-server
+    kyverno:
+      depends:
+        - api-server
+        - webhook-system
+    sentinel:
+      depends:
+        - prometheus
+    remediator:
+      depends:
+        - api-server
+        - argocd
+
+    COOLDOWN_SECONDS = 600
+    MAX_BACKOFF_MULTIPLIER = 8
+    last_remediation = 0
+    backoff_count = 0
+    alert_only_mode = False
+    dependency_model = None
+
+    def now_iso():
+        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    def load_dependency_model():
+        global dependency_model
+        with open('/app/dependency-model.yaml', 'r') as f:
+            dependency_model = yaml.safe_load(f)
+        logging.info('Loaded dependency model: %s', list(dependency_model['components'].keys()))
+
+    def get_dependencies(component):
+        return dependency_model['components'].get(component, {}).get('depends', [])
+
+    def now_iso():
+        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    def load_client():
+        try:
+            config.load_incluster_config()
+        except Exception:
+            config.load_kube_config()
+
+    def annotate_resource(api, group, version, namespace, plural, name, annotation):
+        patch = {'metadata': {'annotations': annotation}}
+        try:
+            api.patch_namespaced_custom_object(group, version, namespace, plural, name, patch)
+            logging.info('Annotated %s/%s %s', plural, name, annotation)
+            return True
+        except ApiException as exc:
+            logging.error('Failed to annotate %s/%s: %s', plural, name, getattr(exc, 'status', exc))
+            return False
+
+    def refresh_application(custom_api):
+        annotation = {'argocd.argoproj.io/refresh-requestedAt': now_iso()}
+        return annotate_resource(custom_api, 'argoproj.io', 'v1alpha1', 'gitops', 'applications', 'kyverno', annotation)
+
+    def refresh_applicationset(custom_api):
+        annotation = {'kyverno-sentinel-remediation': now_iso()}
+        return annotate_resource(custom_api, 'argoproj.io', 'v1alpha1', 'gitops', 'applicationsets', 'k3slab-applicationset', annotation)
+
+    def restart_kyverno_pods(core_api):
+        pods = core_api.list_namespaced_pod('kyverno').items
+        restarted = False
+        for pod in pods:
+            ready = False
+            for condition in pod.status.conditions or []:
+                if condition.type == 'Ready' and condition.status == 'True':
+                    ready = True
+            if not ready:
+                try:
+                    core_api.delete_namespaced_pod(pod.metadata.name, 'kyverno')
+                    restarted = True
+                    logging.info('Deleted unhealthy pod %s', pod.metadata.name)
+                except ApiException as exc:
+                    logging.error('Failed to delete pod %s: %s', pod.metadata.name, getattr(exc, 'status', exc))
+        return restarted
+
+    def check_cluster_health():
+        try:
+            version_api = client.VersionApi()
+            version_api.get_code()
+            logging.info('API server responsive')
+            return True
+        except Exception as exc:
+            logging.warning('API server not responsive: %s', getattr(exc, 'status', exc))
+            return False
+
+    def check_argocd_health(custom_api):
+        try:
+            custom_api.list_namespaced_custom_object('argoproj.io', 'v1alpha1', 'gitops', 'applications', limit=1)
+            logging.info('ArgoCD reachable')
+            return True
+        except Exception as exc:
+            logging.warning('ArgoCD not reachable: %s', getattr(exc, 'status', exc))
+            return False
+
+    def check_prometheus_health(core_api):
+        try:
+            core_api.read_namespaced_service('prometheus', 'monitoring')
+            logging.info('Prometheus service exists')
+            return True
+        except Exception as exc:
+            logging.warning('Prometheus service not available: %s', getattr(exc, 'status', exc))
+            return False
+
+    def has_severe_degradation(health):
+        critical_flags = [
+            health['app_missing'],
+            health['namespace_missing'],
+            health['api_unresponsive'],
+            health['argocd_unreachable'],
+            health['prometheus_unreachable'],
+        ]
+        moderate_flags = [
+            health['webhook_missing'],
+            health['crd_missing'],
+            health['pod_issue'],
+        ]
+        if any(critical_flags):
+            if sum(bool(f) for f in critical_flags) >= 2:
+                return True
+        if sum(bool(f) for f in moderate_flags) >= 3:
+            return True
+        return False
+
+    def get_cooldown():
+        return min(COOLDOWN_SECONDS * (2 ** backoff_count), COOLDOWN_SECONDS * MAX_BACKOFF_MULTIPLIER)
+
+    def check_health(core_api, custom_api, ext_api, admission_api):
+        health = {
+            'app_missing': False,
+            'namespace_missing': False,
+            'webhook_missing': False,
+            'crd_missing': False,
+            'pod_issue': False,
+            'api_unresponsive': False,
+            'argocd_unreachable': False,
+            'prometheus_unreachable': False,
+        }
+
+        if not check_cluster_health(core_api):
+            health['api_unresponsive'] = True
+
+        if not check_argocd_health(custom_api):
+            health['argocd_unreachable'] = True
+
+        if not check_prometheus_health(core_api):
+            health['prometheus_unreachable'] = True
+
+        try:
+            custom_api.get_namespaced_custom_object('argoproj.io', 'v1alpha1', 'gitops', 'applications', 'kyverno')
+            logging.info('Kyverno ArgoCD application exists')
+        except ApiException:
+            health['app_missing'] = True
+            logging.warning('Kyverno ArgoCD application missing')
+
+        try:
+            core_api.read_namespace('kyverno')
+            logging.info('Kyverno namespace exists')
+        except ApiException:
+            health['namespace_missing'] = True
+            logging.warning('Kyverno namespace missing')
+
+        try:
+            webhooks = admission_api.list_validating_webhook_configuration().items
+            if any('kyverno' in wh.metadata.name for wh in webhooks):
+                logging.info('Kyverno webhook exists')
+            else:
+                health['webhook_missing'] = True
+                logging.warning('Kyverno webhook missing')
+        except ApiException:
+            health['webhook_missing'] = True
+            logging.warning('Failed to list validating webhooks')
+
+        for crd in ['clusterpolicies.policy.kyverno.io', 'policyexceptions.policy.kyverno.io']:
+            try:
+                ext_api.read_custom_resource_definition(crd)
+                logging.info('CRD %s exists', crd)
+            except ApiException:
+                health['crd_missing'] = True
+                logging.warning('CRD %s missing', crd)
+
+        try:
+            pods = core_api.list_namespaced_pod('kyverno').items
+            if not pods:
+                health['pod_issue'] = True
+                logging.warning('No Kyverno pods found')
+            else:
+                for pod in pods:
+                    ready = any(c.type == 'Ready' and c.status == 'True' for c in pod.status.conditions or [])
+                    if not ready:
+                        health['pod_issue'] = True
+                        logging.warning('Kyverno pod %s not ready', pod.metadata.name)
+        except ApiException:
+            health['pod_issue'] = True
+            logging.warning('Failed to list Kyverno pods')
+
+        return health
+
+    def component_status(health):
+        status = {
+            'api-server': not health['api_unresponsive'],
+            'argocd': not health['argocd_unreachable'],
+            'prometheus': not health['prometheus_unreachable'],
+            'webhook-system': not health['webhook_missing'],
+            'kyverno': not any([
+                health['app_missing'],
+                health['namespace_missing'],
+                health['crd_missing'],
+                health['pod_issue'],
+                health['webhook_missing'],
+            ]),
+            'sentinel': True,
+            'remediator': True,
+        }
+        return status
+
+    def upstream_healthy(status, component):
+        for dep in get_dependencies(component):
+            if not status.get(dep, False):
+                logging.warning('Upstream dependency %s for %s is unhealthy', dep, component)
+                return False
+            if not upstream_healthy(status, dep):
+                return False
+        return True
+
+    def remediate(custom_api, core_api, health):
+        global last_remediation, backoff_count
+        now = time.time()
+        cooldown = get_cooldown()
+        if now - last_remediation < cooldown:
+            logging.info('Cooldown active (%s seconds), skipping remediation', cooldown)
+            return
+        last_remediation = now
+        logging.info('Starting remediation flow with backoff multiplier %s', 2 ** backoff_count)
+
+        if health['app_missing'] or health['namespace_missing'] or health['crd_missing'] or health['webhook_missing']:
+            refresh_applicationset(custom_api)
+
+        if not health['app_missing']:
+            refresh_application(custom_api)
+
+        if health['pod_issue']:
+            restart_kyverno_pods(core_api)
+
+        backoff_count = min(backoff_count + 1, MAX_BACKOFF_MULTIPLIER)
+        logging.info('Remediation completed, next cooldown %s seconds', get_cooldown())
+
+    def should_remediate(health):
+        global alert_only_mode
+        status = component_status(health)
+
+        if health['api_unresponsive'] or health['argocd_unreachable'] or health['prometheus_unreachable']:
+            alert_only_mode = True
+            logging.warning('Cluster-wide instability detected; switching to alert-only mode')
+            return False
+
+        if has_severe_degradation(health):
+            alert_only_mode = True
+            logging.warning('Severe Kyverno degradation detected; switching to alert-only mode')
+            return False
+
+        if health['app_missing'] or health['namespace_missing'] or health['crd_missing'] or health['webhook_missing'] or health['pod_issue']:
+            if not upstream_healthy(status, 'kyverno'):
+                alert_only_mode = True
+                logging.warning('Kyverno upstream dependencies unhealthy; escalating without remediation')
+                return False
+
+        if alert_only_mode and not any(health.values()):
+            alert_only_mode = False
+            logging.info('System stabilized; clearing alert-only mode')
+
+        return not alert_only_mode
+
+    if __name__ == '__main__':
+        load_client()
+        load_dependency_model()
+        custom_api = client.CustomObjectsApi()
+        core_api = client.CoreV1Api()
+        ext_api = client.ApiextensionsV1Api()
+        admission_api = client.AdmissionregistrationV1Api()
+
+        while True:
+            health = check_health(core_api, custom_api, ext_api, admission_api)
+            if any(health.values()):
+                logging.error('Health check failures detected: %s', health)
+                if should_remediate(health):
+                    remediate(custom_api, core_api, health)
+                else:
+                    logging.warning('Guardrail engaged; skipping remediation this cycle')
+            else:
+                logging.info('All Kyverno control-plane checks healthy')
+                if alert_only_mode:
+                    logging.info('Clearing alert-only mode after stabilization')
+                    alert_only_mode = False
+                    backoff_count = 0
+            time.sleep(30)

@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kyverno-sentinel
+  namespace: kyverno-sentinel
+  labels:
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: kyverno-sentinel
+  namespaceSelector:
+    matchNames:
+      - kyverno-sentinel
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics

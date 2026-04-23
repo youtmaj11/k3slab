@@ -1,0 +1,43 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kyverno-sentinel-alerts
+  namespace: kyverno-sentinel
+  labels:
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: kyverno-sentinel.rules
+      rules:
+        - alert: KyvernoApplicationMissing
+          expr: kyverno_app_missing == 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kyverno ArgoCD Application is missing"
+            description: "The Kyverno Application does not exist in ArgoCD namespace gitops."
+        - alert: KyvernoNamespaceMissing
+          expr: kyverno_namespace_missing == 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kyverno namespace is missing"
+            description: "The Kyverno control-plane namespace is not present in the cluster."
+        - alert: KyvernoWebhookMissing
+          expr: kyverno_webhook_missing == 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kyverno validating webhook is missing"
+            description: "The Kyverno admission webhook configuration is not registered."
+        - alert: KyvernoCRDMissing
+          expr: kyverno_crd_missing == 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kyverno CRDs are missing"
+            description: "At least one required Kyverno CRD is not installed in the cluster."
