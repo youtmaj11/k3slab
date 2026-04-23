@@ -1,9 +1,9 @@
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: audit-deny-privileged-containers
+  name: deny-privileged-containers
 spec:
-  validationFailureAction: enforce
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: deny-privileged-containers
@@ -33,9 +33,9 @@ spec:
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: audit-require-run-as-non-root
+  name: require-run-as-non-root
 spec:
-  validationFailureAction: enforce
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: require-run-as-non-root
@@ -67,7 +67,7 @@ kind: ClusterPolicy
 metadata:
   name: audit-require-resource-limits
 spec:
-  validationFailureAction: audit
+  validationFailureAction: Audit
   background: true
   rules:
     - name: require-resource-limits
@@ -101,41 +101,9 @@ spec:
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: audit-deny-hostpath-volumes
+  name: require-namespace-labels
 spec:
-  validationFailureAction: enforce
-  background: true
-  rules:
-    - name: deny-hostpath-volumes
-      match:
-        resources:
-          kinds:
-            - Pod
-            - Deployment
-            - StatefulSet
-            - DaemonSet
-            - ReplicaSet
-            - Job
-            - CronJob
-      validate:
-        message: "hostPath volumes are not allowed."
-        deny:
-          anyPattern:
-            - spec:
-                template:
-                  spec:
-                    volumes:
-                      - hostPath: "*"
-            - spec:
-                volumes:
-                  - hostPath: "*"
----
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
-metadata:
-  name: audit-require-namespace-labels
-spec:
-  validationFailureAction: enforce
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: require-namespace-labels
