@@ -16,31 +16,6 @@ data:
 
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
 
-dependency-model.yaml: |
-  components:
-    api-server:
-      depends: []
-    argocd:
-      depends:
-        - api-server
-    prometheus:
-      depends:
-        - api-server
-    webhook-system:
-      depends:
-        - api-server
-    kyverno:
-      depends:
-        - api-server
-        - webhook-system
-    sentinel:
-      depends:
-        - prometheus
-    remediator:
-      depends:
-        - api-server
-        - argocd
-
     COOLDOWN_SECONDS = 600
     MAX_BACKOFF_MULTIPLIER = 8
     last_remediation = 0
@@ -59,9 +34,6 @@ dependency-model.yaml: |
 
     def get_dependencies(component):
         return dependency_model['components'].get(component, {}).get('depends', [])
-
-    def now_iso():
-        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     def load_client():
         try:
@@ -324,3 +296,27 @@ dependency-model.yaml: |
                     alert_only_mode = False
                     backoff_count = 0
             time.sleep(30)
+  dependency-model.yaml: |
+    components:
+      api-server:
+        depends: []
+      argocd:
+        depends:
+          - api-server
+      prometheus:
+        depends:
+          - api-server
+      webhook-system:
+        depends:
+          - api-server
+      kyverno:
+        depends:
+          - api-server
+          - webhook-system
+      sentinel:
+        depends:
+          - prometheus
+      remediator:
+        depends:
+          - api-server
+          - argocd
