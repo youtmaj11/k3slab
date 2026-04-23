@@ -21,9 +21,6 @@ metadata:
   name: prometheus-access-binding
 subjects:
   - kind: ServiceAccount
-    name: prometheus
-    namespace: monitoring
-  - kind: ServiceAccount
     name: kube-prometheus-stack-prometheus
     namespace: monitoring
 roleRef:
