@@ -1,14 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kyverno
+  name: kyverno-bootstrap
   namespace: gitops
 spec:
   project: default
   source:
     repoURL: https://github.com/youtmaj11/k3slab.git
     targetRevision: HEAD
-    path: k8s/security/kyverno
+    path: k8s/security/kyverno/kyverno-app
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno

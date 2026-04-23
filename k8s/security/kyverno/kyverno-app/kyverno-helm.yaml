@@ -23,6 +23,7 @@ spec:
       timeoutSeconds: 10
     cleanup:
       enabled: true
+    backgroundProcessing: true
     resources:
       requests:
         cpu: 100m

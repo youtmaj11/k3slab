@@ -5,7 +5,7 @@ This folder contains the Kyverno policies used for cluster-wide admission contro
 ## Installation
 
 Kyverno is installed via Helm using the manifest in this folder:
-- `k8s/security/kyverno/kyverno-helm.yaml`
+- `k8s/security/kyverno/kyverno-app/kyverno-helm.yaml`
 
 ## Global policy definitions
 
@@ -32,7 +32,28 @@ The following cluster-wide policies are defined in `global-enforcement-policies.
 
 ## Kyverno runtime installation
 
-Kyverno is installed by ArgoCD using `k8s/gitops/argocd-kyverno-app.yaml` and the Helm chart manifest in this folder.
+Kyverno is installed by ArgoCD through the ApplicationSet and a root bootstrap safety app.
+
+- Standard GitOps flow: `k8s/security/kyverno/*` is included in `k8s/gitops/argocd-applicationset.yaml`.
+- Bootstrap safety net: `k8s/gitops/root-app/root-app.yaml` ensures `kyverno` is installed even if directory discovery fails.
+
+## Bootstrap reliability
+
+The ApplicationSet provides scalable discovery for Kyverno application directories, but directory wildcard matching can be fragile when the install manifest is not placed under a subdirectory.
+
+The safety net root app ensures:
+- a Kyverno application always exists in ArgoCD
+- the `kyverno` namespace is created
+- Helm chart installation and CRDs are bootstrapped
+- admission webhook configuration is installed
+
+## Failure mode analysis
+
+ApplicationSet-only bootstrap is unsafe because:
+- `k8s/security/kyverno/*` only matches subdirectories, not files directly under `k8s/security/kyverno`
+- if the install manifest sits in the parent directory, no Application is generated silently
+- no generated Application means Kyverno is never installed and no failure is surfaced in ArgoCD UI
+- the root-app safety net avoids this by explicitly creating a bootstrap Application
 
 ## Testing steps
 
@@ -61,8 +82,8 @@ kubectl get mutatingwebhookconfigurations | grep kyverno || true
 
 ## Troubleshooting
 
-- If `kyverno` namespace is missing, confirm ArgoCD synced `k8s/gitops/argocd-kyverno-app.yaml`.
+- If `kyverno` namespace is missing, confirm ArgoCD synced `k8s/gitops/root-app/root-app.yaml` or the generated `kyverno` application from the ApplicationSet.
 - If `kyverno-admission-controller` is not running, check pod logs with `kubectl logs -n kyverno -l app=kyverno`.
 - If webhook resources are missing, verify the Helm chart was installed with `installCRDs: true`.
 - If enforcement is not rejecting, confirm `validationFailureAction: enforce` on critical `ClusterPolicy` resources.
-- namespace creation with required labels
+- If the ApplicationSet generated app is missing, verify `k8s/security/kyverno/*` and `k8s/gitops/root-app/*` are included in `k8s/gitops/argocd-applicationset.yaml`.
