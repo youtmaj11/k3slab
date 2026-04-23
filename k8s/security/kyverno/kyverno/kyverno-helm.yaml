@@ -13,12 +13,17 @@ spec:
   targetNamespace: kyverno
   createNamespace: true
   valuesContent: |
+    installCRDs: true
     replicaCount: 1
     image:
       tag: v2.6.0
     webhook:
+      enabled: true
       failurePolicy: Fail
       timeoutSeconds: 10
+    cleanup:
+      enabled: true
+    backgroundProcessing: true
     resources:
       requests:
         cpu: 100m
