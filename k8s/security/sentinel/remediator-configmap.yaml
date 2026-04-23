@@ -9,17 +9,56 @@ data:
   remediator.py: |
     import logging
     import time
+    import yaml
     from datetime import datetime, timezone
     from kubernetes import client, config
     from kubernetes.client.exceptions import ApiException
 
     logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
 
+dependency-model.yaml: |
+  components:
+    api-server:
+      depends: []
+    argocd:
+      depends:
+        - api-server
+    prometheus:
+      depends:
+        - api-server
+    webhook-system:
+      depends:
+        - api-server
+    kyverno:
+      depends:
+        - api-server
+        - webhook-system
+    sentinel:
+      depends:
+        - prometheus
+    remediator:
+      depends:
+        - api-server
+        - argocd
+
     COOLDOWN_SECONDS = 600
     MAX_BACKOFF_MULTIPLIER = 8
     last_remediation = 0
     backoff_count = 0
     alert_only_mode = False
+    dependency_model = None
+
+    def now_iso():
+        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    def load_dependency_model():
+        global dependency_model
+        with open('/app/dependency-model.yaml', 'r') as f:
+            dependency_model = yaml.safe_load(f)
+        logging.info('Loaded dependency model: %s', list(dependency_model['components'].keys()))
+
+    def get_dependencies(component):
+        return dependency_model['components'].get(component, {}).get('depends', [])
 
     def now_iso():
         return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -187,6 +226,33 @@ data:
 
         return health
 
+    def component_status(health):
+        status = {
+            'api-server': not health['api_unresponsive'],
+            'argocd': not health['argocd_unreachable'],
+            'prometheus': not health['prometheus_unreachable'],
+            'webhook-system': not health['webhook_missing'],
+            'kyverno': not any([
+                health['app_missing'],
+                health['namespace_missing'],
+                health['crd_missing'],
+                health['pod_issue'],
+                health['webhook_missing'],
+            ]),
+            'sentinel': True,
+            'remediator': True,
+        }
+        return status
+
+    def upstream_healthy(status, component):
+        for dep in get_dependencies(component):
+            if not status.get(dep, False):
+                logging.warning('Upstream dependency %s for %s is unhealthy', dep, component)
+                return False
+            if not upstream_healthy(status, dep):
+                return False
+        return True
+
     def remediate(custom_api, core_api, health):
         global last_remediation, backoff_count
         now = time.time()
@@ -211,21 +277,33 @@ data:
 
     def should_remediate(health):
         global alert_only_mode
+        status = component_status(health)
+
         if health['api_unresponsive'] or health['argocd_unreachable'] or health['prometheus_unreachable']:
             alert_only_mode = True
             logging.warning('Cluster-wide instability detected; switching to alert-only mode')
             return False
+
         if has_severe_degradation(health):
             alert_only_mode = True
             logging.warning('Severe Kyverno degradation detected; switching to alert-only mode')
             return False
+
+        if health['app_missing'] or health['namespace_missing'] or health['crd_missing'] or health['webhook_missing'] or health['pod_issue']:
+            if not upstream_healthy(status, 'kyverno'):
+                alert_only_mode = True
+                logging.warning('Kyverno upstream dependencies unhealthy; escalating without remediation')
+                return False
+
         if alert_only_mode and not any(health.values()):
             alert_only_mode = False
             logging.info('System stabilized; clearing alert-only mode')
+
         return not alert_only_mode
 
     if __name__ == '__main__':
         load_client()
+        load_dependency_model()
         custom_api = client.CustomObjectsApi()
         core_api = client.CoreV1Api()
         ext_api = client.ApiextensionsV1Api()

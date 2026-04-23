@@ -23,7 +23,7 @@ spec:
             - sh
             - -c
             - |
-              python -m pip install --no-cache-dir kubernetes >/dev/null 2>&1 && python /app/remediator.py
+              python -m pip install --no-cache-dir kubernetes pyyaml >/dev/null 2>&1 && python /app/remediator.py
           volumeMounts:
             - name: script
               mountPath: /app

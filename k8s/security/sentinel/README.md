@@ -33,6 +33,20 @@ A companion controller deployment runs continuously and performs auto-remediatio
 - restarts unhealthy Kyverno pods
 - includes cooldown and exponential backoff logic to avoid remediation storms
 
+## Dependency model
+
+The remediator uses a ConfigMap-driven dependency graph stored in `dependency-model.yaml`.
+
+- `api-server` has no dependencies
+- `argocd` depends on `api-server`
+- `prometheus` depends on `api-server`
+- `webhook-system` depends on `api-server`
+- `kyverno` depends on `api-server` and `webhook-system`
+- `sentinel` depends on `prometheus`
+- `remediator` depends on `api-server` and `argocd`
+
+This model ensures remediation is only attempted when upstream dependencies are healthy.
+
 ## Guardrail layer
 
 The remediator evaluates global control-plane health before taking action:
