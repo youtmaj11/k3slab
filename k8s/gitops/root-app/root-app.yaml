@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/youtmaj11/k3slab.git
     targetRevision: HEAD
-    path: k8s/security/kyverno/kyverno-app
+    path: k8s/security/kyverno/kyverno
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno

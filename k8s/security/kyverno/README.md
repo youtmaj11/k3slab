@@ -35,7 +35,7 @@ The following cluster-wide policies are defined in `global-enforcement-policies.
 Kyverno is installed by ArgoCD through the ApplicationSet and a root bootstrap safety app.
 
 - Standard GitOps flow: `k8s/security/kyverno/*` is included in `k8s/gitops/argocd-applicationset.yaml`.
-- Bootstrap safety net: `k8s/gitops/root-app/root-app.yaml` ensures `kyverno` is installed even if directory discovery fails.
+- Bootstrap safety net: `k8s/gitops/root-app/root-app.yaml` is a fallback manifest and is not actively included in ApplicationSet discovery.
 
 ## Bootstrap reliability
 
@@ -46,6 +46,12 @@ The safety net root app ensures:
 - the `kyverno` namespace is created
 - Helm chart installation and CRDs are bootstrapped
 - admission webhook configuration is installed
+
+## Ownership model
+
+- Primary source of truth: ApplicationSet-based GitOps via `k8s/gitops/argocd-applicationset.yaml`.
+- Root bootstrap app: fallback template stored in `k8s/gitops/root-app/root-app.yaml` and intentionally excluded from ApplicationSet discovery.
+- This prevents duplicate reconciliation loops and ensures only one controller manages Kyverno in normal operation.
 
 ## Failure mode analysis
 
