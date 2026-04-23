@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kyverno-sentinel-script
+  namespace: kyverno-sentinel
+  labels:
+    app: kyverno-sentinel
+data:
+  health-check.sh: |
+    #!/usr/bin/env sh
+    set -euo pipefail
+    checks=0
+    failures=0
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Kyverno sentinel health check started"
+
+    check() {
+      checks=$((checks + 1))
+      if ! sh -c "$1" >/dev/null 2>&1; then
+        echo "[FAIL] $2"
+        failures=$((failures + 1))
+      else
+        echo "[OK] $2"
+      fi
+    }
+
+    check "kubectl get application kyverno -n gitops" "ArgoCD Application kyverno exists"
+    check "kubectl get namespace kyverno" "namespace kyverno exists"
+    check "kubectl get pod -n kyverno | grep -E 'kyverno-admission-controller|kyverno-background-controller'" "Kyverno pods exist"
+    check "kubectl get crd clusterpolicies.policy.kyverno.io" "ClusterPolicy CRD exists"
+    check "kubectl get crd policyexceptions.policy.kyverno.io" "PolicyException CRD exists"
+    check "kubectl get validatingwebhookconfigurations | grep -i kyverno" "Kyverno validating webhook exists"
+
+    if [ "$failures" -gt 0 ]; then
+      echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Kyverno sentinel detected ${failures}/${checks} failures"
+      exit 1
+    fi
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Kyverno sentinel healthy"
